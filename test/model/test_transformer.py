@@ -3,7 +3,7 @@ from typing import Mapping
 
 import jax
 
-from DEQModel.model.transformer_block import TransformerBlock
+from DEQModel.model.model import TransformerBlock
 import haiku as hk
 import jax.numpy as jnp
 
