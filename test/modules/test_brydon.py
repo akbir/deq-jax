@@ -17,7 +17,9 @@ def test_brydon():
     th = torch.tensor(values, dtype=torch.float32)
     ja = jnp.asarray(values, dtype=jnp.float32)
 
-    jax_ans = broyden(jax.jit(quadratic), ja, threshold, eps)
+    broyden_jit = jax.jit(broyden, static_argnums=(0, 2, 3))
+
+    jax_ans = broyden_jit(jax.jit(quadratic), ja, threshold, eps)
     th_ans = th_broyden(quadratic, th, threshold, eps)
 
     np.testing.assert_array_almost_equal(np.array(jax_ans['result']), th_ans['result'].numpy(), decimal=6)

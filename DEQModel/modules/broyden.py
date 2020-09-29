@@ -90,13 +90,12 @@ def line_search(g: Callable, update, x0: jnp.ndarray, g0: jnp.ndarray):
     g0_new = g(x_est)
     return x_est - x0, g0_new - g0
 
-@functools.partial(jax.jit, static_argnums=(0,2,3))
 def broyden(g: Callable, x0: jnp.ndarray, maxiter: int, eps: float) -> dict:
     """
     :param g: Function to find root of (e.g g(x) = f(x)-x)
     :param x0: Initial guess  (batch_size, hidden, seq_length)
     :param maxiter: maximum number of iterations.
-    :param eps: terminates minimization when |J|_norm < g_tol
+    :param eps: terminates minimization when |J^_1|_norm < eps
 
     ``broyden`` supports ``jit`` compilation. It does not yet support
     differentiation or arguments in the form of multi-dimensional arrays

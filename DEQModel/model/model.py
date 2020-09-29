@@ -9,6 +9,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from DEQModel.modules.broyden import broyden
+
 
 class Attention(hk.Module):
     """A general multi-headed attention module."""
@@ -98,11 +100,13 @@ class TransformerBlock(hk.Module):
 
     def __init__(self,
                  num_heads: int,
+                 num_layers: int,
                  dropout_rate: float,
                  name: Optional[str] = None):
 
         super().__init__(name=name)
         self._num_heads = num_heads
+        self._num_layers = num_layers
         self._dropout_rate = dropout_rate
 
     def __call__(self,
@@ -123,16 +127,17 @@ class TransformerBlock(hk.Module):
         if mask is not None:
             mask = mask[:, None, None, :]
 
-        h_norm = layer_norm(h, name=f'h_ln_1')
-        h_attn = CausalSelfAttention(self._num_heads,
-                                     init_scale,
-                                     name=f'h_attn')(h_norm, mask)
-        h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn)
-        h = h + h_attn
-        h_norm = layer_norm(h, name=f'h_ln_2')
-        h_dense = DenseBlock(init_scale, name=f'h_mlp')(h_norm)
-        h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense)
-        h = h + h_dense
+        for i in range(self._num_layers):
+            h_norm = layer_norm(h, name=f'h{i}_ln_1')
+            h_attn = CausalSelfAttention(self._num_heads,
+                                         init_scale,
+                                         name=f'h{i}_attn')(h_norm, mask)
+            h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn)
+            h = h + h_attn
+            h_norm = layer_norm(h, name=f'h{i}_ln_2')
+            h_dense = DenseBlock(init_scale, name=f'h{i}_mlp')(h_norm)
+            h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense)
+            h = h + h_dense
         h = layer_norm(h, name='ln_f')
 
         return h
@@ -144,4 +149,38 @@ def layer_norm(x: jnp.ndarray, name: Optional[str] = None) -> jnp.ndarray:
                         create_scale=True,
                         create_offset=True,
                         name=name)(x)
+
+
+class DEQTransformer(hk.Module):
+    def __init__(self,
+                 num_heads: int,
+                 num_layers: int,
+                 dropout_rate: float,
+                 name: Optional[str] = None):
+        super().__init__(name=name)
+        self._num_heads = num_heads
+        self._dropout_rate = dropout_rate
+        self._num_layers = num_layers
+
+
+    def __call__(self,
+                 h: jnp.ndarray,
+                 mask: Optional[jnp.ndarray],
+                 is_training: bool,
+                 max_iter: int,
+                 eps: float) -> jnp.ndarray:
+
+        transformer = TransformerBlock(self._num_heads,
+                                       self._num_layers,
+                                       self._dropout_rate,
+                                       name='TransformerBlock')
+        h = transformer(h, mask, is_training)
+
+        # apply root find on the function and output of transformer
+        def g(x):
+            return transformer(x, mask, is_training) - x
+
+        h = broyden(g, h, max_iter, eps)['result']
+
+        return h
 

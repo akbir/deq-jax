@@ -32,7 +32,7 @@ from absl import flags
 from absl import logging
 import haiku as hk
 from DEQModel.model import dataset
-from DEQModel.model import transformer_block as model
+from DEQModel.model import model
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -43,7 +43,7 @@ flags.DEFINE_integer('sequence_length', 128, 'Sequence length to learn on')
 
 flags.DEFINE_integer('d_model', 256, 'model width')
 flags.DEFINE_integer('num_heads', 4, 'Number of attention heads')
-flags.DEFINE_integer('num_layers', 6, 'Number of transformer layers')
+flags.DEFINE_integer('num_layers', 1, 'Number of transformer layers')
 flags.DEFINE_float('dropout_rate', 0.1, 'Dropout rate')
 
 flags.DEFINE_float('learning_rate', 2e-4, 'Max learning-rate')
@@ -60,7 +60,6 @@ MAX_STEPS = 10**6
 def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
                      num_layers: int, dropout_rate: float):
   """Create the model's forward pass."""
-
   def forward_fn(data: Mapping[str, jnp.ndarray],
                  is_training: bool = True) -> jnp.ndarray:
     """Forward pass."""
@@ -77,9 +76,12 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
     input_embeddings = token_embs + positional_embeddings
 
     # Run the transformer over the inputs.
-    transformer = model.Transformer(
-        num_heads=num_heads, num_layers=num_layers, dropout_rate=dropout_rate)
-    output_embeddings = transformer(input_embeddings, input_mask, is_training)
+    transformer = model.DEQTransformer(
+      num_heads=num_heads,
+      num_layers=num_layers,
+      dropout_rate=dropout_rate)
+
+    output_embeddings = transformer(input_embeddings, input_mask, is_training, 30, 0.1)
 
     # Reverse the embeddings (untied).
     return hk.Linear(vocab_size)(output_embeddings)
