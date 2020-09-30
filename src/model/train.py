@@ -1,16 +1,4 @@
-# Copyright 2020 DeepMind Technologies Limited. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Modified from https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py
 # ==============================================================================
 """Train a transformer for language modeling on LM1B.
 This example serves to demonstrate:
@@ -86,7 +74,8 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
                                     is_training)
 
     equilibrium = model.EquilibriumLayer(max_iter)
-    hidden_star = equilibrium(lambda x: transformer(x, input_mask, False), output_embeddings)
+    hidden_star = equilibrium(lambda x: transformer(x, input_mask, False),
+                              output_embeddings)
     # Reverse the embeddings (untied).
     return hk.Linear(vocab_size)(hidden_star)
 
@@ -158,7 +147,6 @@ class Updater:
         'loss': loss,
     }
     return new_state, metrics
-
 
 class CheckpointingUpdater:
   """A didactic checkpointing wrapper around an Updater.
