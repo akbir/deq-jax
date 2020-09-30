@@ -6,8 +6,8 @@ import haiku as hk
 import jax.numpy as jnp
 import numpy as np
 
-from DEQModel.model import model
-from DEQModel.model.train import build_forward_fn, lm_loss_fn
+from src.model import model
+from src.model.train import build_forward_fn, lm_loss_fn
 
 
 def test_simple_rootfind():

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.autograd import Function
 
-from DEQModel.modules.th_brydon import th_broyden
+from src.modules.th_brydon import th_broyden
 
 
 class RootFind(Function):

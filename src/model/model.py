@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from DEQModel.modules.broyden import broyden
+from src.modules.broyden import broyden
 
 
 class Attention(hk.Module):

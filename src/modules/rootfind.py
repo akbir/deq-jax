@@ -2,7 +2,7 @@ from functools import partial
 import jax.numpy as jnp
 import jax
 
-from DEQModel.modules.broyden import broyden
+from src.modules.broyden import broyden
 
 
 def f(func, z1ss, uss, z0, *args):

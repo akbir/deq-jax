@@ -31,8 +31,8 @@ from absl import app
 from absl import flags
 from absl import logging
 import haiku as hk
-from DEQModel.model import dataset
-from DEQModel.model import model
+from src.model import dataset
+from src.model import model
 import jax
 import jax.numpy as jnp
 import numpy as np

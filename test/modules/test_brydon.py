@@ -3,8 +3,8 @@ import jax
 import numpy as np
 import torch
 
-from DEQModel.modules.th_brydon import th_broyden, th_rmatvec, th_matvec
-from DEQModel.modules.broyden import broyden, rmatvec
+from src.modules.th_brydon import th_broyden, th_rmatvec, th_matvec
+from src.modules.broyden import broyden, rmatvec
 
 
 def test_brydon():
