@@ -90,11 +90,11 @@ def line_search(g: Callable, update, x0: jnp.ndarray, g0: jnp.ndarray):
     g0_new = g(x_est)
     return x_est - x0, g0_new - g0
 
-def broyden(g: Callable, x0: jnp.ndarray, maxiter: int, eps: float) -> dict:
+def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float) -> dict:
     """
     :param g: Function to find root of (e.g g(x) = f(x)-x)
     :param x0: Initial guess  (batch_size, hidden, seq_length)
-    :param maxiter: maximum number of iterations.
+    :param max_iter: maximum number of iterations.
     :param eps: terminates minimization when |J^_1|_norm < eps
 
     ``broyden`` supports ``jit`` compilation. It does not yet support
@@ -102,18 +102,17 @@ def broyden(g: Callable, x0: jnp.ndarray, maxiter: int, eps: float) -> dict:
     :return:
     """
 
-    # Inv-Jacobian update (J_n)
     # Update rule is J_n = J_n-1 + delta_J, so iteratively write J = J_0 + J_1 + J_2 + ...
     # For memory constraints J = U * V^T
     # So J = U_0 * V^T_0 + U_1 * V^T_1 + ..
-
     # For fast calculation of inv_jacobian (approximately) we store as Us and VTs
+
     bsz, total_hsize, seq_len = x0.shape
     gx = g(x0)  # (bsz, 2d, L')
     init_objective = jnp.linalg.norm(gx)
 
     # To be used in protective breaks
-    trace = jnp.zeros(maxiter)
+    trace = jnp.zeros(max_iter)
     trace = jax.ops.index_update(trace, jax.ops.index[0], init_objective)
     protect_thres = 1e5 * seq_len
 
@@ -127,8 +126,8 @@ def broyden(g: Callable, x0: jnp.ndarray, maxiter: int, eps: float) -> dict:
         gx=gx,
         objective=init_objective,
         trace=trace,
-        Us=jnp.zeros((bsz, total_hsize, seq_len, maxiter)),
-        VTs=jnp.zeros((bsz, maxiter, total_hsize, seq_len)),
+        Us=jnp.zeros((bsz, total_hsize, seq_len, max_iter)),
+        VTs=jnp.zeros((bsz, max_iter, total_hsize, seq_len)),
         prot_break=False,
         prog_break=False,
     )
@@ -137,9 +136,9 @@ def broyden(g: Callable, x0: jnp.ndarray, maxiter: int, eps: float) -> dict:
         return (jnp.logical_not(state.converged) &
                 jnp.logical_not(state.prot_break) &
                 jnp.logical_not(state.prog_break) &
-                (state.n_step < maxiter))
+                (state.n_step < max_iter))
 
-    def body_fun(state: _BroydenResults):
+    def body_fun(_, state: _BroydenResults):
         inv_jacobian = -matvec(state.Us, state.VTs, state.gx)
         dx, delta_gx = line_search(g, inv_jacobian, state.x, state.gx)
 
@@ -171,8 +170,9 @@ def broyden(g: Callable, x0: jnp.ndarray, maxiter: int, eps: float) -> dict:
 
         return state
 
-    state = jax.lax.while_loop(cond_fun, body_fun, state)
-
+    # state = jax.lax.while_loop(cond_fun, body_fun, state)
+    # state = jax.lax.fori_loop(0, 1, body_fun, state)
+    state = body_fun(None, state)
     return {"result": state.min_x,
             "n_step": state.n_step,
             "diff": jnp.linalg.norm(state.min_gx),
@@ -180,4 +180,4 @@ def broyden(g: Callable, x0: jnp.ndarray, maxiter: int, eps: float) -> dict:
             "prot_break": state.prot_break,
             "trace": state.trace,
             "eps": eps,
-            "maxiter": maxiter}
+            "maxiter": max_iter}

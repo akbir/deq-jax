@@ -5,25 +5,11 @@ import jax
 from src.modules.broyden import broyden
 
 
-def f(func, z1ss, uss, z0, *args):
-    return func(z1ss, uss, z0, *args)
-
-
-def g(func, z1ss, uss, z0, *args):
-    return f(func, z1ss, uss, z0, *args) - z1ss
-
-
-@partial(jax.custom_vjp, nondiff_argnums=(0, 2, 3))
-def rootfind(func, z1ss: jnp.ndarray, uss: jnp.ndarray, z0: jnp.ndarray, maxiter):
-    z1ss_est = z1ss.copy()
-    eps = 1e-6 * jnp.sqrt(z1ss.size)
-
-    def g_to_optimise(x):
-        return g(func, x, uss, z0)
-
-    result_info = broyden(g_to_optimise, z1ss_est, maxiter, eps)
-    z1ss_est = result_info['result']
-    return z1ss_est
+@partial(jax.custom_vjp, nondiff_argnums=(0, 2))
+def rootfind(func, x: jnp.ndarray, max_iter):
+    eps = 1e-6 * jnp.sqrt(x.size)
+    result_info = broyden(func, x, max_iter, eps)
+    return result_info['result']
 
 
 def rootfind_fwd(func, z1ss, uss, z0, threshold):
@@ -45,9 +31,11 @@ def rootfind_bwd(res, grad):
     eps = 2e-10 * jnp.sqrt(grad.size)
     dl_df_est = jnp.zeros_like(grad)
 
-    result_info = broyden(h_function, dl_df_est, maxiter=30, eps=eps)
+    result_info = broyden(h_function, dl_df_est, max_iter=30, eps=eps)
     dl_df_est = result_info['result']
     return dl_df_est
 
 
 rootfind.defvjp(rootfind_fwd, rootfind_bwd)
+
+

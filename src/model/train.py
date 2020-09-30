@@ -26,6 +26,8 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 
+from src.modules.rootfind import rootfind
+
 flags.DEFINE_integer('batch_size', 16, 'Train batch size per core')
 flags.DEFINE_integer('sequence_length', 128, 'Sequence length to learn on')
 
@@ -73,9 +75,9 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
                                     input_mask,
                                     is_training)
 
-    equilibrium = model.EquilibriumLayer(max_iter)
-    hidden_star = equilibrium(lambda x: transformer(x, input_mask, False),
-                              output_embeddings)
+    hidden_star = rootfind(lambda x: transformer(x, input_mask, False) - x,
+                           output_embeddings,
+                           max_iter)
     # Reverse the embeddings (untied).
     return hk.Linear(vocab_size)(hidden_star)
 

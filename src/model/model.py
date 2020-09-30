@@ -154,15 +154,3 @@ def layer_norm(x: jnp.ndarray, name: Optional[str] = None) -> jnp.ndarray:
                         create_scale=True,
                         create_offset=True,
                         name=name)(x)
-
-
-class EquilibriumLayer(hk.Module):
-    def __init__(self, max_iter: int, name: Optional[str] = None):
-        super().__init__(name=name)
-        self._max_iter = max_iter
-
-    def __call__(self, func: Callable, x: jnp.ndarray):
-        def g(x):
-            # Find stationary point of aux function
-            return func(x)-x
-        return broyden(g, x, self._max_iter, 1e-6 * x.size)['result']
