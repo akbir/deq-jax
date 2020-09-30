@@ -58,7 +58,7 @@ MAX_STEPS = 10**6
 
 
 def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
-                     num_layers: int, dropout_rate: float):
+                     num_layers: int, dropout_rate: float, max_iter: int):
   """Create the model's forward pass."""
   def forward_fn(data: Mapping[str, jnp.ndarray],
                  is_training: bool = True) -> jnp.ndarray:
@@ -76,15 +76,19 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
     input_embeddings = token_embs + positional_embeddings
 
     # Run the transformer over the inputs.
-    transformer = model.DEQTransformer(
+    transformer = model.TransformerBlock(
       num_heads=num_heads,
       num_layers=num_layers,
       dropout_rate=dropout_rate)
 
-    output_embeddings = transformer(input_embeddings, input_mask, is_training, 30, 0.1)
+    output_embeddings = transformer(input_embeddings,
+                                    input_mask,
+                                    is_training)
 
+    equilibrium = model.EquilibriumLayer(max_iter)
+    hidden_star = equilibrium(lambda x: transformer(x, input_mask, False), output_embeddings)
     # Reverse the embeddings (untied).
-    return hk.Linear(vocab_size)(output_embeddings)
+    return hk.Linear(vocab_size)(hidden_star)
 
   return forward_fn
 

@@ -1,8 +1,8 @@
 # modified from https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py
 
 """Transformer model components."""
-
-from typing import Optional
+from functools import partial
+from typing import Optional, Callable
 
 import haiku as hk
 import jax
@@ -14,6 +14,7 @@ from DEQModel.modules.broyden import broyden
 
 class Attention(hk.Module):
     """A general multi-headed attention module."""
+
     def __init__(self,
                  num_heads: int,
                  init_scale: float,
@@ -67,6 +68,7 @@ class Attention(hk.Module):
 
 class CausalSelfAttention(Attention):
     """Self attention with a causal mask applied."""
+
     def __call__(self, x: jnp.ndarray, mask: Optional[jnp.ndarray], **kwargs) -> jnp.ndarray:
         seq_len = x.shape[1]
         causal_mask = np.tril(np.ones((seq_len, seq_len)))
@@ -79,6 +81,7 @@ class CausalSelfAttention(Attention):
 
 class DenseBlock(hk.Module):
     """A 2-layer MLP which widens then narrows the input."""
+
     def __init__(self,
                  init_scale: float,
                  widening_factor: int = 4,
@@ -132,11 +135,13 @@ class TransformerBlock(hk.Module):
             h_attn = CausalSelfAttention(self._num_heads,
                                          init_scale,
                                          name=f'h{i}_attn')(h_norm, mask)
-            h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn)
+
+            # placed dropout behind is_training flag, otherwise haiku won't work
+            h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn) if is_training else h_attn
             h = h + h_attn
             h_norm = layer_norm(h, name=f'h{i}_ln_2')
             h_dense = DenseBlock(init_scale, name=f'h{i}_mlp')(h_norm)
-            h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense)
+            h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense) if is_training else h_dense
             h = h + h_dense
         h = layer_norm(h, name='ln_f')
 
@@ -151,36 +156,13 @@ def layer_norm(x: jnp.ndarray, name: Optional[str] = None) -> jnp.ndarray:
                         name=name)(x)
 
 
-class DEQTransformer(hk.Module):
-    def __init__(self,
-                 num_heads: int,
-                 num_layers: int,
-                 dropout_rate: float,
-                 name: Optional[str] = None):
+class EquilibriumLayer(hk.Module):
+    def __init__(self, max_iter: int, name: Optional[str] = None):
         super().__init__(name=name)
-        self._num_heads = num_heads
-        self._dropout_rate = dropout_rate
-        self._num_layers = num_layers
+        self._max_iter = max_iter
 
-
-    def __call__(self,
-                 h: jnp.ndarray,
-                 mask: Optional[jnp.ndarray],
-                 is_training: bool,
-                 max_iter: int,
-                 eps: float) -> jnp.ndarray:
-
-        transformer = TransformerBlock(self._num_heads,
-                                       self._num_layers,
-                                       self._dropout_rate,
-                                       name='TransformerBlock')
-        h = transformer(h, mask, is_training)
-
-        # apply root find on the function and output of transformer
+    def __call__(self, func: Callable, x: jnp.ndarray):
         def g(x):
-            return transformer(x, mask, is_training) - x
-
-        h = broyden(g, h, max_iter, eps)['result']
-
-        return h
-
+            # Find stationary point of aux function
+            return func(x)-x
+        return broyden(g, x, self._max_iter, 1e-6 * x.size)['result']
