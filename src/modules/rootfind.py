@@ -1,41 +1,47 @@
 from functools import partial
+from typing import Callable
+
 import jax.numpy as jnp
 import jax
 
 from src.modules.broyden import broyden
 
 
-@partial(jax.custom_vjp, nondiff_argnums=(0, 2))
-def rootfind(func, x: jnp.ndarray, max_iter):
+def g(func, x, *args):
+    return f(func, x, *args) - x
+
+def f(func, x, *args):
+    return func(x, *args)
+
+@partial(jax.custom_vjp, nondiff_argnums=(1, 2))
+def rootfind(x: jnp.ndarray, func: Callable, max_iter: int):
+    g_to_opt = partial(g, func)
     eps = 1e-6 * jnp.sqrt(x.size)
-    result_info = broyden(func, x, max_iter, eps)
+    result_info = broyden(g_to_opt, x, max_iter, eps)
     return result_info['result']
 
-
-def rootfind_fwd(func, z1ss, uss, z0, threshold):
+def rootfind_fwd(x, func, max_iter):
+    z_star = rootfind(x, func, max_iter)
     # Returns primal output and residuals to be used in backward pass by f_bwd.
-    return rootfind(func, z1ss, uss, z0, threshold), (func, z1ss, uss, z0, threshold)
+    return z_star, (z_star,)
 
-
-def rootfind_bwd(res, grad):
-    grad = grad.copy()
-    func, z1ss, uss, z0, _ = res
-
-    y = lambda x: g(func, x, uss, z0)
+def rootfind_bwd(func, max_iter, res, grad):
+    # returns dl/dz_star * J^(-1)_{g}
+    (z_star,) = res
+    g_to_opt = partial(g, func)
 
     def h_function(x):
-        primal, vjp = jax.vjp(y, z1ss)
-        JTx = vjp(x)
+        _, f_vjp = jax.vjp(g_to_opt, z_star)
+        # returns tuple for each arg
+        (JTx,) = f_vjp(x)
         return JTx + grad
 
     eps = 2e-10 * jnp.sqrt(grad.size)
     dl_df_est = jnp.zeros_like(grad)
 
-    result_info = broyden(h_function, dl_df_est, max_iter=30, eps=eps)
+    result_info = broyden(h_function, dl_df_est, max_iter, eps=eps)
     dl_df_est = result_info['result']
-    return dl_df_est
+    return dl_df_est,
 
 
 rootfind.defvjp(rootfind_fwd, rootfind_bwd)
-
-

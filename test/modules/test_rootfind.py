@@ -1,4 +1,7 @@
+from functools import partial
+
 import jax
+from jax import value_and_grad
 
 from src.modules.rootfind import rootfind
 import jax.numpy as jnp
@@ -7,14 +10,40 @@ def test_rootfind_equality():
     pass
 
 
-def test_rootfind_jit():
+def test_rootfind_1D():
     @jax.jit
     def func(x):
         return x**2
 
-    jit_rootfind = jax.jit(rootfind, static_argnums=[0,2])
-    jit_rootfind(func, jnp.ones((1,2,3)), 30)
+    jit_rootfind = jax.jit(rootfind, static_argnums=[1, 2])
 
+    def toy_model(x):
+        y = func(x)
+        return jnp.sum(rootfind(y, func, 30))
+
+    root = jit_rootfind(jnp.ones((1,2,3)), func, 30)
+    value, grad = value_and_grad(toy_model)(jnp.ones((1,2,3)))
+
+    assert (6.0 == value or 0. == value)
+
+def test_rootfind_multi_variable():
+    @jax.jit
+    def func(x, w):
+        return w * x
+
+    jit_rootfind = jax.jit(rootfind, static_argnums=[1, 2])
+
+    def toy_model(params, x):
+        y = func(x, params)
+        f = partial(func, w=params)
+        return jnp.sum(rootfind(y, f, 30))
+
+    params = jnp.zeros((1, 2, 3))
+    # value, grad = value_and_grad(toy_model, argnums=1)(params, jnp.ones((1,2,3)))
+
+    value, grad = value_and_grad(toy_model)(params, jnp.ones((1,2,3)))
+
+    assert (12.0 == value or 0. == value)
 
 def test_rootfind_with_haiku_func():
     def build_forward(output_size):
@@ -22,15 +51,24 @@ def test_rootfind_with_haiku_func():
             return hk.Linear(output_size)(x)
         return forward_fn
 
-    input = jnp.ones((1,2,3))
+    inputs = jnp.zeros((1,2,3))
     rng = jax.random.PRNGKey(42)
     forward_fn = build_forward(3)
     forward_fn = hk.transform(forward_fn)
-    params = forward_fn.init(rng, input)
+    params = forward_fn.init(rng, inputs)
 
-    func = lambda x: forward_fn.apply(params, rng, input)
-    root = rootfind(jax.jit(func), jnp.ones((1,2,3)), 30)
+    def toy_model(params, rng, x):
+        y = forward_fn.apply(params, rng, x)
+        return jnp.sum(rootfind(y, lambda z: forward_fn.apply(params, rng, z), 30))
 
+    root = rootfind(jnp.ones((1, 2, 3)),
+                    lambda x: forward_fn.apply(params, rng, x),
+                    30)
+
+    value = toy_model(params, rng, jnp.ones((1, 2, 3)))
+
+    value, grad = value_and_grad(toy_model)(params, rng, inputs)
+    assert (jnp.sum(root) == value).any()
 
 
 def test_rootfind_in_haiku():
@@ -38,10 +76,11 @@ def test_rootfind_in_haiku():
         def forward_fn(x: jnp.ndarray) -> jnp.ndarray:
             linear = hk.Linear(output_size, name='l1')
             h = linear(x)
-            func = lambda x: linear(x) - x
-            y = rootfind(func, h, max_iter)
-            return hk.Linear(output_size, name='l2')(y)
+            func = lambda z: linear(z) - z
+            y = rootfind(h, func, max_iter)
+            return hk.Linear(output_size, name='l2')
         return forward_fn
+
 
     input = jnp.ones((1,2,3))
     rng = jax.random.PRNGKey(42)
@@ -49,5 +88,10 @@ def test_rootfind_in_haiku():
     forward_fn = hk.transform(forward_fn)
     params = forward_fn.init(rng, input)
 
-    fwd = jax.jit(forward_fn.apply)
-    return fwd(params, rng, input)
+    def loss_fn(params, rng, x):
+        return jnp.sum(forward_fn.apply(params, rng, x))
+
+
+    value, grad = value_and_grad(loss_fn)(params, rng, jnp.ones((1, 2, 3)))
+
+

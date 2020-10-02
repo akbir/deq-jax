@@ -75,9 +75,7 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
                                     input_mask,
                                     is_training)
 
-    hidden_star = rootfind(lambda x: transformer(x, input_mask, False) - x,
-                           output_embeddings,
-                           max_iter)
+    hidden_star = rootfind(output_embeddings, lambda x: transformer(x, input_mask, False) - x, max_iter)
     # Reverse the embeddings (untied).
     return hk.Linear(vocab_size)(hidden_star)
 

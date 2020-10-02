@@ -138,7 +138,7 @@ def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float) -> dict:
                 jnp.logical_not(state.prog_break) &
                 (state.n_step < max_iter))
 
-    def body_fun(_, state: _BroydenResults):
+    def body_fun(state: _BroydenResults):
         inv_jacobian = -matvec(state.Us, state.VTs, state.gx)
         dx, delta_gx = line_search(g, inv_jacobian, state.x, state.gx)
 
@@ -170,9 +170,9 @@ def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float) -> dict:
 
         return state
 
-    # state = jax.lax.while_loop(cond_fun, body_fun, state)
+    state = jax.lax.while_loop(cond_fun, body_fun, state)
     # state = jax.lax.fori_loop(0, 1, body_fun, state)
-    state = body_fun(None, state)
+    # state = body_fun(_, state)
     return {"result": state.min_x,
             "n_step": state.n_step,
             "diff": jnp.linalg.norm(state.min_gx),

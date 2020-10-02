@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Mapping, Optional
 
 import jax
@@ -5,8 +6,8 @@ import jax
 import haiku as hk
 import jax.numpy as jnp
 import numpy as np
+from jax import value_and_grad
 
-from src.model import model
 from src.model.train import build_forward_fn, lm_loss_fn
 from src.modules.rootfind import rootfind
 
@@ -19,14 +20,14 @@ def test_simple_rootfind():
             tokens = data['obs']
             def g(x):
                 return x ** 2
-            return rootfind(g, tokens, max_iter)
+            return rootfind(tokens, g, max_iter)
         return forward_fn
 
     rng = jax.random.PRNGKey(42)
     forward_fn = build_forward_rootfind(50)
     forward_fn = hk.transform(forward_fn)
 
-    data = {'obs': jnp.asarray(1 + np.random.rand(2,5,6))}
+    data = {'obs': jnp.asarray(np.random.rand(2,5,6))}
     params = forward_fn.init(rng, data)
     jit_fwd = jax.jit(forward_fn.apply)
     result = jit_fwd(params, rng, data)
@@ -55,7 +56,7 @@ def test_transform_with_rng_update_fails():
 
             output_embedding = transformer(tokens)
             # Apply rootfind
-            hidden = rootfind(func, output_embedding, max_iter)
+            hidden = rootfind(output_embedding, func, max_iter)
             return hk.Linear(vocab_size)(hidden)
 
         return forward_fn
@@ -87,6 +88,7 @@ def test_transform_deq():
     forward_fn = jax.jit(forward_fn.apply)
     forward_fn(params, rng, data)
 
+
 def test_loss_grad():
     vocab_size, d_model, num_heads, num_layers, dropout_rate = 50, 20, 4, 1, 0.1
     forward_fn = build_forward_fn(vocab_size,
@@ -97,10 +99,13 @@ def test_loss_grad():
                                   30)
 
     rng = jax.random.PRNGKey(42)
-    forward_fn = hk.transform(forward_fn)
     data = {'obs': jnp.asarray(np.random.rand(8, 5), dtype=jnp.int32),
             'target': jnp.ones((8, 5))}
 
+
+    forward_fn = hk.transform(forward_fn)
     params = forward_fn.init(rng, data)
-    forward_fn = jax.jit(forward_fn.apply)
-    loss = lm_loss_fn(forward_fn, vocab_size, params, rng, True)
+    loss_fn = partial(lm_loss_fn, forward_fn.apply, vocab_size)
+    jit_loss = jax.jit(loss_fn)
+
+    loss, grad = value_and_grad(jit_loss)(params, rng, data)
