@@ -17,7 +17,9 @@ def f(func, x, *args):
 def rootfind(x: jnp.ndarray, func: Callable, max_iter: int):
     g_to_opt = partial(g, func)
     eps = 1e-6 * jnp.sqrt(x.size)
-    result_info = broyden(g_to_opt, x, max_iter, eps)
+    # stop gradients for anything from root search
+    result_info = jax.lax.stop_gradient(
+        broyden(g_to_opt, x, max_iter, eps))
     return result_info['result']
 
 def rootfind_fwd(x, func, max_iter):
@@ -29,9 +31,9 @@ def rootfind_bwd(func, max_iter, res, grad):
     # returns dl/dz_star * J^(-1)_{g}
     (z_star,) = res
     g_to_opt = partial(g, func)
+    _, f_vjp = jax.vjp(g_to_opt, z_star)
 
     def h_function(x):
-        _, f_vjp = jax.vjp(g_to_opt, z_star)
         # returns tuple for each arg
         (JTx,) = f_vjp(x)
         return JTx + grad

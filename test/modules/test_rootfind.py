@@ -27,21 +27,25 @@ def test_rootfind_1D():
     assert (6.0 == value or 0. == value)
 
 def test_rootfind_multi_variable():
-    @jax.jit
     def func(x, w):
         return w * x
 
-    jit_rootfind = jax.jit(rootfind, static_argnums=[1, 2])
-
-    def toy_model(params, x):
-        y = func(x, params)
+    def toy_model(params, data):
+        y = func(data, params)
         f = partial(func, w=params)
         return jnp.sum(rootfind(y, f, 30))
 
     params = jnp.zeros((1, 2, 3))
-    # value, grad = value_and_grad(toy_model, argnums=1)(params, jnp.ones((1,2,3)))
+    data = jnp.ones((1,2,3))
 
-    value, grad = value_and_grad(toy_model)(params, jnp.ones((1,2,3)))
+    g = lambda x: func(x, params) - x
+    y = func(data, params)
+    root = rootfind(y, g, 30)
+    _, f_vjp = jax.vjp(g, root)
+
+    value, grad = value_and_grad(toy_model, argnums=1)(params, data)
+
+    value, grad = value_and_grad(toy_model)(params, data)
 
     assert (12.0 == value or 0. == value)
 
