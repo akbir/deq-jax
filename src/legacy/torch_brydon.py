@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import torch
 
 
 def th_safe_norm(v):
@@ -121,7 +121,8 @@ def th_broyden(g, x0, threshold, eps, ls=False, name="unknown"):
     # For fast calculation of inv_jacobian (approximately)
     Us = torch.zeros(bsz, total_hsize, seq_len, threshold)  # One can also use an L-BFGS scheme to further reduce memory
     VTs = torch.zeros(bsz, threshold, total_hsize, seq_len)
-    update = -th_matvec(Us[:, :, :, :nstep], VTs[:, :nstep], gx)  # Formally should be -torch.matmul(inv_jacobian (-I), gx)
+    update = -th_matvec(Us[:, :, :, :nstep], VTs[:, :nstep],
+                        gx)  # Formally should be -torch.matmul(inv_jacobian (-I), gx)
     new_objective = init_objective = torch.norm(gx).item()
     prot_break = False
     trace = [init_objective]
@@ -153,7 +154,8 @@ def th_broyden(g, x0, threshold, eps, ls=False, name="unknown"):
 
         part_Us, part_VTs = Us[:, :, :, :nstep - 1], VTs[:, :nstep - 1]
         vT = th_rmatvec(part_Us, part_VTs, delta_x)
-        u = (delta_x - th_matvec(part_Us, part_VTs, delta_gx)) / torch.einsum('bij, bij -> b', vT, delta_gx)[:, None, None]
+        u = (delta_x - th_matvec(part_Us, part_VTs, delta_gx)) / torch.einsum('bij, bij -> b', vT, delta_gx)[:, None,
+                                                                 None]
         vT[vT != vT] = 0
         u[u != u] = 0
         VTs[:, nstep - 1] = vT

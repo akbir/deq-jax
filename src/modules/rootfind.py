@@ -7,35 +7,43 @@ import jax
 from src.modules.broyden import broyden
 
 
-def g(func, x, *args):
-    return f(func, x, *args) - x
+def g(fun, x, *args):
+    return f(fun, x, *args) - x
 
-def f(func, x, *args):
-    return func(x, *args)
+
+def f(fun, x, *args):
+    return fun(x, *args)
+
 
 @partial(jax.custom_vjp, nondiff_argnums=(1, 2))
-def rootfind(x: jnp.ndarray, func: Callable, max_iter: int):
-    g_to_opt = partial(g, func)
+def rootfind(x: jnp.ndarray, fun: Callable, max_iter: int, *args):
+    g_to_opt = partial(g, fun)
     eps = 1e-6 * jnp.sqrt(x.size)
-    # stop gradients for anything from root search
     result_info = jax.lax.stop_gradient(
-        broyden(g_to_opt, x, max_iter, eps))
+        broyden(g_to_opt, x, max_iter, eps, *args)
+    )
     return result_info['result']
 
-def rootfind_fwd(x, func, max_iter):
-    z_star = rootfind(x, func, max_iter)
-    # Returns primal output and residuals to be used in backward pass by f_bwd.
-    return z_star, (z_star,)
 
-def rootfind_bwd(func, max_iter, res, grad):
-    # returns dl/dz_star * J^(-1)_{g}
-    (z_star,) = res
-    g_to_opt = partial(g, func)
-    _, f_vjp = jax.vjp(g_to_opt, z_star)
+def rootfind_fwd(x: jnp.ndarray, fun: Callable, max_iter: int, *args):
+    """A JAX layer for applying rootfind(g, z, *args) to a function (fun)
+    Requires fun to be form f(x, *args), where x is the value to optimise
+    """
+    z_star = rootfind(x, fun, max_iter, *args)
+
+    # Returns primal output and residuals to be used in backward pass by f_bwd.
+    return z_star, (z_star, *args)
+
+
+def rootfind_bwd(fun, max_iter, res, grad):
+    # returns dl/dz_star * J ^ (-1)_{g}
+    (z_star, *args) = res
+    g_to_opt = partial(g, fun)
+    _, g_vjp = jax.vjp(g_to_opt, z_star, *args)
 
     def h_function(x):
-        # returns tuple for each arg
-        (JTx,) = f_vjp(x)
+        # ToDo: g_vjp is dependent on fun (e.g haiku module, haiku transform or jax func)
+        (JTx, *JT_args) = g_vjp(x)
         return JTx + grad
 
     eps = 2e-10 * jnp.sqrt(grad.size)
@@ -43,7 +51,24 @@ def rootfind_bwd(func, max_iter, res, grad):
 
     result_info = broyden(h_function, dl_df_est, max_iter, eps=eps)
     dl_df_est = result_info['result']
-    return dl_df_est,
+    # passed back gradient via d/dx and return nothing to other params
+    empty_grads = tuple(jnp.zeros_like(arg) for arg in args)
+    return dl_df_est, *empty_grads
 
 
 rootfind.defvjp(rootfind_fwd, rootfind_bwd)
+
+@partial(jax.custom_vjp, nondiff_argnums=(1,))
+def toyfun(x: jnp.ndarray, fun: Callable):
+    return jax.lax.stop_gradient(fun(x))
+
+def toy_fwd(x: jnp.ndarray, fun: Callable):
+    return toyfun(x, fun), (toyfun(x, fun), toyfun)
+
+def toy_bwd(fun, res, grad):
+    output, fun = res
+    x_vjp = jax.vjp(fun, output)
+
+    return grad*x_vjp(output)
+
+toyfun.defvjp(toy_fwd, toy_bwd)
