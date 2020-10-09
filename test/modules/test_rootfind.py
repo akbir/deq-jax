@@ -3,7 +3,7 @@ from typing import Optional
 import jax
 from jax import value_and_grad
 
-from src.modules.rootfind import rootfind, toyfun
+from src.modules.rootfind import rootfind, h
 import jax.numpy as jnp
 import haiku as hk
 
@@ -100,24 +100,14 @@ def test_rootfind_in_haiku_fn():
 
 
 def test_rootfind_in_haiku_module():
-    class RootFind(hk.Module):
-        def __init__(self,
-                     output: int,
-                     name: Optional[str] = None):
-            super().__init__(name=name)
-            self.output = output
-
-        def __call__(self, x: jnp.ndarray):
-            linear = hk.Linear(self.output, name='l1')
-            h = linear(x)
-            y = rootfind(h, linear, 30)
-            return hk.Linear(self.output, name='l2')(y)
-
     # currently failing as g is not haiku transformed
     def build_forward(output_size, max_iter):
         def forward_fn(x: jnp.ndarray) -> jnp.ndarray:
-            rootfind = RootFind(output_size)
-            return rootfind(x)
+            linear_1 = hk.Linear(output_size, name='l1')
+            linear_2 = hk.Linear(output_size, name='l2')
+            h = linear_2(x)
+            y = rootfind(h, hk.Linear(output_size, name='l1'), max_iter)
+            return hk.Linear(output_size)(y)
         return forward_fn
 
     input = jnp.ones((1,2,3))
@@ -126,6 +116,7 @@ def test_rootfind_in_haiku_module():
     forward_fn = hk.transform(forward_fn)
     params = forward_fn.init(rng, input)
 
+    @jax.jit
     def loss_fn(params, rng, x):
         h = forward_fn.apply(params, rng, x)
         return jnp.sum(h)
@@ -136,9 +127,12 @@ def test_rootfind_in_haiku_module():
 def test_passing_bk_haiku_fn():
     def build_forward(output_size):
         def forward_fn(x: jnp.ndarray) -> jnp.ndarray:
-            linear = hk.Linear(output_size, name='l1')
-            h = linear(x)
-            y = toyfun(h, linear)
+            #mock embeddings
+            linear_1 = hk.Linear(output_size, name='l1')
+            #mock transformer
+            linear_2 = hk.Linear(output_size, name='l2')
+            z = linear_1(x)
+            y = h(z, linear_2)
             return y
         return forward_fn
 
@@ -154,5 +148,6 @@ def test_passing_bk_haiku_fn():
 
     value = loss_fn(params, rng, jnp.ones((1, 2, 3)))
     value, grad = value_and_grad(loss_fn)(params, rng, jnp.ones((1, 2, 3)))
+    print(grad)
 
 
