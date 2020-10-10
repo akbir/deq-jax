@@ -3,6 +3,7 @@ from typing import Callable
 
 import jax.numpy as jnp
 import jax
+import haiku as hk
 
 from src.modules.broyden import broyden
 
@@ -15,8 +16,8 @@ def f(fun, x, *args):
     return fun(x, *args)
 
 
-@partial(jax.custom_vjp, nondiff_argnums=(1, 2))
-def rootfind(x: jnp.ndarray, fun: Callable, max_iter: int, *args):
+@partial(jax.custom_vjp, nondiff_argnums=(0, 2))
+def rootfind(fun: Callable, x: jnp.ndarray, max_iter: int, *args):
     g_to_opt = partial(g, fun)
     eps = 1e-6 * jnp.sqrt(x.size)
     result_info = jax.lax.stop_gradient(
@@ -25,11 +26,11 @@ def rootfind(x: jnp.ndarray, fun: Callable, max_iter: int, *args):
     return result_info['result']
 
 
-def rootfind_fwd(x: jnp.ndarray, fun: Callable, max_iter: int, *args):
+def rootfind_fwd(fun: Callable, x: jnp.ndarray, max_iter: int, *args):
     """A JAX layer for applying rootfind(g, z, *args) to a function (fun)
     Requires fun to be form f(x, *args), where x is the value to optimise
     """
-    z_star = rootfind(x, fun, max_iter, *args)
+    z_star = rootfind(fun, x, max_iter, *args)
 
     # Returns primal output and residuals to be used in backward pass by f_bwd.
     return z_star, (z_star, *args)
@@ -58,17 +59,16 @@ def rootfind_bwd(fun, max_iter, res, grad):
 
 rootfind.defvjp(rootfind_fwd, rootfind_bwd)
 
-@partial(jax.custom_vjp, nondiff_argnums=(1,))
-def h(x: jnp.ndarray, fun: Callable):
+@partial(jax.custom_vjp, nondiff_argnums=(0,))
+def h(fun: Callable, x: jnp.ndarray):
     return jax.lax.stop_gradient(fun(x))
 
-def h_fwd(x: jnp.ndarray, fun: Callable):
-    return h(x, fun), h(x, fun)
+def h_fwd(fun: Callable, x: jnp.ndarray):
+    return h(fun, x), h(fun, x)
 
 def h_bwd(fun, res, grad):
     output, = res
     x_vjp = jax.vjp(fun, output)
-
     return grad*x_vjp(output)
 
 h.defvjp(h_fwd, h_bwd)

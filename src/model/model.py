@@ -1,15 +1,12 @@
 # modified from https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py
 
 """Transformer model components."""
-from functools import partial
 from typing import Optional, Callable
 
 import haiku as hk
 import jax
 import jax.numpy as jnp
 import numpy as np
-
-from src.modules.broyden import broyden
 
 
 class Attention(hk.Module):
@@ -135,13 +132,11 @@ class TransformerBlock(hk.Module):
             h_attn = CausalSelfAttention(self._num_heads,
                                          init_scale,
                                          name=f'h{i}_attn')(h_norm, mask)
-
-            # placed dropout behind is_training flag, otherwise haiku won't work
-            h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn) if is_training else h_attn
+            h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn)
             h = h + h_attn
             h_norm = layer_norm(h, name=f'h{i}_ln_2')
             h_dense = DenseBlock(init_scale, name=f'h{i}_mlp')(h_norm)
-            h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense) if is_training else h_dense
+            h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense)
             h = h + h_dense
         h = layer_norm(h, name='ln_f')
 
