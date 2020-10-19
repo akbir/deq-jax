@@ -59,17 +59,3 @@ def rootfind_bwd(fun, max_iter, res, grad):
 
 
 rootfind.defvjp(rootfind_fwd, rootfind_bwd)
-
-@partial(jax.custom_vjp, nondiff_argnums=(0,))
-def h(fun: Callable, x: jnp.ndarray):
-    return jax.lax.stop_gradient(fun(x))
-
-def h_fwd(fun: Callable, x: jnp.ndarray):
-    return h(fun, x), h(fun, x)
-
-def h_bwd(fun, res, grad):
-    output, = res
-    x_vjp = jax.vjp(fun, output)
-    return grad*x_vjp(output)
-
-h.defvjp(h_fwd, h_bwd)
