@@ -11,6 +11,7 @@ This repo provides the following re-usable components:
 
 1. Jax implementation of the Broyden's method, a quasi-Newton method for finding roots in k variables. This method is JIT-able.
 2. Jax implementation of DeepEquilbrium's Rootfind method with custom vector-Jacobi product (backwards method)
+3. (WIP) Haiku implementation of the Transformer XL
 
 ## Credits
-The repo takes direct inspiration from the [original implementation](https://github.com/locuslab/deq/tree/master) by Shaojie in Torch. The transformer module is taken from the Haiku example.
+The repo takes direct inspiration from the [original implementation](https://github.com/locuslab/deq/tree/master) by Shaojie in Torch. The transformer module is modified from the Haiku [example](https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py).
