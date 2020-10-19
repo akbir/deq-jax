@@ -1,11 +1,11 @@
-from typing import Optional
+from functools import partial
 
+import haiku as hk
 import jax
+import jax.numpy as jnp
 from jax import value_and_grad
 
 from deq_jax.src.modules.rootfind import rootfind, h
-import jax.numpy as jnp
-import haiku as hk
 
 
 def test_rootfind_1D():
@@ -93,20 +93,18 @@ def test_rootfind_in_haiku_module():
     value, grad = value_and_grad(loss_fn)(params, rng, jnp.ones((1, 2, 3)))
 
 
-def test_passing_bk_haiku_fn():
-    Rootfind = hk.to_module(h)
-
+def test_simple_haiku_fn():
     def build_forward(output_size):
         def forward_fn(x: jnp.ndarray) -> jnp.ndarray:
             # mock embeddings
             linear_1 = hk.Linear(output_size, name='l1')
             # mock transformer
             linear_2 = hk.Linear(output_size, name='l2')
+            Rootfind = hk.to_module(partial(h, linear_2))
             h_layer = Rootfind(name='rf')
             z = linear_1(x)
-            y = h_layer(linear_2, z)
+            y = h_layer(z)
             return y
-
         return forward_fn
 
     input = jnp.ones((1, 2, 3))

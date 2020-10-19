@@ -39,6 +39,7 @@ def rootfind_fwd(fun: Callable, x: jnp.ndarray, max_iter: int, *args):
 def rootfind_bwd(fun, max_iter, res, grad):
     # returns dl/dz_star * J ^ (-1)_{g}
     (z_star, *args) = res
+    fun = hk.experimental.lift(fun)
     g_to_opt = partial(g, fun)
     _, g_vjp = jax.vjp(g_to_opt, z_star, *args)
 
