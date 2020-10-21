@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jax import value_and_grad
 
-from deq_jax.src.modules.rootfind import rootfind, h
+from deq_jax.src.modules.rootfind import rootfind
 
 
 def test_rootfind_1D():
@@ -13,67 +13,46 @@ def test_rootfind_1D():
     def func(x):
         return x ** 2
 
-    jit_rootfind = jax.jit(rootfind, static_argnums=[0, 2])
+    jit_rootfind = jax.jit(rootfind, static_argnums=[0, 1])
 
     def toy_model(x):
-        y = func(x)
-        return jnp.sum(rootfind(func, y, 30))
+        return jnp.sum(rootfind(func, 30, x))
 
-    root = jit_rootfind(func, jnp.ones((1, 2, 3)), 30)
+    root = jit_rootfind(func, 30, jnp.ones((1,2,3)))
     value, grad = value_and_grad(toy_model)(jnp.ones((1, 2, 3)))
 
     assert (6.0 == value or 0. == value)
 
 
 def test_rootfind_multi_variable():
-    def layer(x, w):
-        return x * w
+    def layer(w, x):
+        return w * x
 
-    def toy_model(params, data):
-        y = layer(data, params)
-        return jnp.sum(rootfind(layer, y, 30, params))
+    def toy_model(data, params):
+        fun = lambda z: layer(params, z) - z
+        return jnp.sum(rootfind(fun, 30, data))
 
     params = -2 * jnp.ones((1, 2, 3))
     data = jnp.ones((1, 2, 3))
-    value, grad = value_and_grad(toy_model)(params, data)
+    value, grad = value_and_grad(toy_model)(data, params)
 
     assert (-6.0 == value or 0. == value)
     assert (grad == 1 / 3 * jnp.ones((1, 2, 3))).all()
-
-
-def test_rootfind_in_haiku_fn():
-    # currently failing as g is not haiku transformed
-    def build_forward(output_size, max_iter):
-        def forward_fn(x: jnp.ndarray) -> jnp.ndarray:
-            linear = hk.Linear(output_size, name='l1')
-            h = linear(x)
-            y = rootfind(linear, h, max_iter)
-            return hk.Linear(output_size, name='l2')(y)
-
-        return forward_fn
-
-    input = jnp.ones((1, 2, 3))
-    rng = jax.random.PRNGKey(42)
-    forward_fn = build_forward(3, 10)
-    forward_fn = hk.transform(forward_fn)
-    params = forward_fn.init(rng, input)
-
-    def loss_fn(params, rng, x):
-        h = forward_fn.apply(params, rng, x)
-        return jnp.sum(h)
-
-    value = loss_fn(params, rng, jnp.ones((1, 2, 3)))
-    value, grad = value_and_grad(loss_fn)(params, rng, jnp.ones((1, 2, 3)))
-
 
 def test_rootfind_in_haiku_module():
     # currently failing as g is not haiku transformed
     def build_forward(output_size, max_iter):
         def forward_fn(x: jnp.ndarray) -> jnp.ndarray:
+            # mock transformer
             linear_1 = hk.Linear(output_size, name='l1')
-            linear_2 = hk.Linear(output_size, name='l2')
-            h = linear_2(x)
-            y = rootfind(linear_1, h, max_iter)
+            transformed_linear = hk.without_apply_rng(
+                hk.transform(linear_1)
+            )
+            inner_params = hk.experimental.lift(
+                transformed_linear.init)(hk.next_rng_key(), x)
+
+            fun = lambda z: transformed_linear.apply(inner_params, z) - z
+            y = rootfind(fun, max_iter, x)
             return hk.Linear(output_size)(y)
 
         return forward_fn
@@ -91,32 +70,3 @@ def test_rootfind_in_haiku_module():
 
     value = loss_fn(params, rng, jnp.ones((1, 2, 3)))
     value, grad = value_and_grad(loss_fn)(params, rng, jnp.ones((1, 2, 3)))
-
-
-def test_simple_haiku_fn():
-    def build_forward(output_size):
-        def forward_fn(x: jnp.ndarray) -> jnp.ndarray:
-            # mock embeddings
-            linear_1 = hk.Linear(output_size, name='l1')
-            # mock transformer
-            linear_2 = hk.Linear(output_size, name='l2')
-            Rootfind = hk.to_module(partial(h, linear_2))
-            h_layer = Rootfind(name='rf')
-            z = linear_1(x)
-            y = h_layer(z)
-            return y
-        return forward_fn
-
-    input = jnp.ones((1, 2, 3))
-    rng = jax.random.PRNGKey(42)
-    forward_fn = build_forward(3)
-    forward_fn = hk.transform(forward_fn)
-    params = forward_fn.init(rng, input)
-
-    def loss_fn(params, rng, x):
-        h = forward_fn.apply(params, rng, x)
-        return jnp.sum(h)
-
-    value = loss_fn(params, rng, jnp.ones((1, 2, 3)))
-    value, grad = value_and_grad(loss_fn)(params, rng, jnp.ones((1, 2, 3)))
-    print(grad)
