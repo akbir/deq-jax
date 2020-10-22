@@ -17,8 +17,8 @@ def rootfind(fun: Callable, max_iter: int, x: jnp.ndarray):
 
 
 def rootfind_fwd(fun: Callable, max_iter: int, x: jnp.ndarray):
-    """A JAX layer for applying rootfind(g, z, *args) to a function (fun)
-    Requires fun to be form f(x, *args), where x is the value to optimise
+    """Layer for applying rootfind(g, z, x) to a function (fun)
+    Requires fun to be form f(x), where x is the value to optimise, other values must be frozen
     """
     z_star = rootfind(fun, max_iter, x)
 
