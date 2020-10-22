@@ -13,5 +13,55 @@ This repo provides the following re-usable components:
 2. Jax implementation of DeepEquilbrium's Rootfind method with custom vector-Jacobi product (backwards method)
 3. (WIP) Haiku implementation of the Transformer XL
 
+## Usage
+All DEQ instantiations share the same underlying framework, whose core functionalities are provided in src/modules.
+In particular, `rootfind.py` provides the Jax functions that solves for the roots in forward and backward passes. `broyden.py` provides an implementation of the Broyden's method.
+
+ ```python
+import haiku as hk
+import jax
+import jax.numpy as jnp
+from jax import value_and_grad
+
+from deq_jax.src.modules.rootfind import rootfind
+
+def build_forward(output_size, max_iter):
+    def forward_fn(x: jnp.ndarray) -> jnp.ndarray:
+        # create original layers and transform them inside Hk
+        network = hk.Linear(output_size, name='l1')
+        transformed_net = hk.without_apply_rng(
+            hk.transform(network)
+        )
+        
+        # lift params
+        inner_params = hk.experimental.lift(
+            transformed_net.init)(hk.next_rng_key(), x)
+        
+        # define equilbrium eq (f(z)-z)
+        def fun(z): return transformed_net.apply(inner_params, z) - z
+        
+        # find equilbrium point
+        z = rootfind(fun, max_iter, x)
+
+        # for training net, apply once more through network
+        y = transformed_net.apply(inner_params, z)
+        return hk.Linear(output_size)(y)
+
+    return forward_fn
+
+input = jnp.ones((1, 2, 3))
+rng = jax.random.PRNGKey(42)
+forward_fn = build_forward(3, 10)
+forward_fn = hk.transform(forward_fn)
+params = forward_fn.init(rng, input)
+
+@jax.jit
+def loss_fn(params, rng, x):
+    h = forward_fn.apply(params, rng, x)
+    return jnp.sum(h)
+
+
+value, grad = value_and_grad(loss_fn)(params, rng, jnp.ones((1, 2, 3)))
+```
 ## Credits
-The repo takes direct inspiration from the [original implementation](https://github.com/locuslab/deq/tree/master) by Shaojie in Torch. The transformer module is modified from the Haiku [example](https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py).
+The repo takes direct inspiration from the [original implementation](https://github.com/locuslab/deq/tree/master) by Shaojie in Torch. The transformer module is modified from an [example](https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py) provided by Haiku.
