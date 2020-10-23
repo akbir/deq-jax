@@ -23,11 +23,11 @@ import jax
 import jax.numpy as jnp
 from jax import value_and_grad
 
-from deq_jax.src.modules.rootfind import rootfind
+from deq_jax.src.modules.deq import deq
 
 def build_forward(output_size, max_iter):
     def forward_fn(x: jnp.ndarray, is_training: bool) -> jnp.ndarray:
-        # create original layers and transform them inside Hk
+        # create original layers and transform them 
         network = hk.Linear(output_size, name='l1')
         transformed_net = hk.without_apply_rng(
             hk.transform(network)
@@ -37,17 +37,11 @@ def build_forward(output_size, max_iter):
         inner_params = hk.experimental.lift(
             transformed_net.init)(hk.next_rng_key(), x)
         
-        # define equilbrium eq (f(z)-z)
-        def fun(z): return transformed_net.apply(inner_params, z) - z
-        
-        # find equilbrium point
-        z = rootfind(fun, max_iter, x)
+        # apply deq to functions of form f(params, x)
+        z = deq(transformed_net.apply, max_iter,
+                inner_params, x, is_training)
 
-        # for training net, apply once more through network
-        if is_training:
-            z = transformed_net.apply(inner_params, z)
         return hk.Linear(output_size)(z)
-
     return forward_fn
 
 input = jnp.ones((1, 2, 3))
