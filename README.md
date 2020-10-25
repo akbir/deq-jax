@@ -10,7 +10,7 @@ Python >= 3.5 and Haiku >= 0.0.2
 This repo provides the following re-usable components:
 
 1. Jax implementation of the Broyden's method, a quasi-Newton method for finding roots in k variables. This method is JIT-able.
-2. Jax implementation of DeepEquilbrium's Rootfind method with custom vector-Jacobi product (backwards method)
+2. Jax implementation of Rootfind forward and backward method with custom vector-Jacobi product (backwards method)
 3. (WIP) Haiku implementation of the Transformer XL
 
 ## Usage
@@ -29,17 +29,15 @@ def build_forward(output_size, max_iter):
     def forward_fn(x: jnp.ndarray, is_training: bool) -> jnp.ndarray:
         # create original layers and transform them 
         network = hk.Linear(output_size, name='l1')
-        transformed_net = hk.without_apply_rng(
-            hk.transform(network)
-        )
-        
+        transformed_net = hk.transform(network)
+
         # lift params
         inner_params = hk.experimental.lift(
             transformed_net.init)(hk.next_rng_key(), x)
         
-        # apply deq to functions of form f(params, x)
-        z = deq(transformed_net.apply, max_iter,
-                inner_params, x, is_training)
+        # apply deq to functions of form f(params, z)
+        z = deq(inner_params, hk.next_rng_key(), x,
+                 transformed_net.apply, max_iter, is_training)
 
         return hk.Linear(output_size)(z)
     return forward_fn
@@ -59,4 +57,5 @@ def loss_fn(params, rng, x):
 value, grad = value_and_grad(loss_fn)(params, rng, jnp.ones((1, 2, 3)))
 ```
 ## Credits
-The repo takes direct inspiration from the [original implementation](https://github.com/locuslab/deq/tree/master) by Shaojie in Torch. The transformer module is modified from an [example](https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py) provided by Haiku.
+The repo takes direct inspiration from the [original implementation](https://github.com/locuslab/deq/tree/master) by Shaojie in Torch.
+ The transformer module is modified from an [example](https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py) provided by Haiku.

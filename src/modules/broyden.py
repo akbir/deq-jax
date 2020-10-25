@@ -46,8 +46,8 @@ _einsum = partial(jnp.einsum, precision=lax.Precision.HIGHEST)
 def rmatvec(Us: jnp.ndarray, VTs: jnp.ndarray, x: jnp.ndarray) -> jnp.ndarray:
     # Compute x^T(-I + UV^T)
     # x: (N, 2d, L')
-    # part_Us: (N, 2d, L', threshold)
-    # part_VTs: (N, threshold, 2d, L')
+    # Us: (N, 2d, L', threshold)
+    # VTs: (N, threshold, 2d, L')
     if Us.size == 0:
         return -x
     xTU = _einsum('bij, bijd -> bd', x, Us)  # (N, threshold)
@@ -80,16 +80,16 @@ def update(delta_x, delta_gx, Us, VTs, n_step):
     return Us, VTs
 
 
-def line_search(g: Callable, update, x0: jnp.ndarray, g0: jnp.ndarray, *args):
+def line_search(g: Callable, direction: jnp.ndarray, x0: jnp.ndarray, g0: jnp.ndarray):
     """
     `update` is the proposed direction of update.
     """
     s = 1.0
-    x_est = x0 + s * update
-    g0_new = g(x_est, *args)
+    x_est = x0 + s * direction
+    g0_new = g(x_est)
     return x_est - x0, g0_new - g0
 
-def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float, *args) -> dict:
+def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float) -> dict:
     """
     :param g: Function to find root of (e.g g(x) = f(x)-x)
     :param x0: Initial guess  (batch_size, hidden, seq_length)
@@ -107,7 +107,7 @@ def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float, *args) -> d
     # For fast calculation of inv_jacobian (approximately) we store as Us and VTs
 
     bsz, total_hsize, seq_len = x0.shape
-    gx = g(x0, *args)  # (bsz, 2d, L')
+    gx = g(x0)  # (bsz, 2d, L')
     init_objective = jnp.linalg.norm(gx)
 
     # To be used in protective breaks
@@ -137,9 +137,9 @@ def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float, *args) -> d
                 jnp.logical_not(state.prog_break) &
                 (state.n_step < max_iter))
 
-    def body_fun(_, state: _BroydenResults):
+    def body_fun(state: _BroydenResults):
         inv_jacobian = -matvec(state.Us, state.VTs, state.gx)
-        dx, delta_gx = line_search(g, inv_jacobian, state.x, state.gx, *args)
+        dx, delta_gx = line_search(g, inv_jacobian, state.x, state.gx)
 
         state = state._replace(
             x=state.x + dx,
@@ -171,8 +171,8 @@ def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float, *args) -> d
 
 
     # state = body_fun(state)
-    # state = jax.lax.while_loop(cond_fun, body_fun, state)
-    state = jax.lax.fori_loop(0, max_iter, body_fun, state)
+    state = jax.lax.while_loop(cond_fun, body_fun, state)
+    # state = jax.lax.fori_loop(0, max_iter, body_fun, state)
     # state = hk.fori_loop(0, max_iter, body_fun, state)
     return {"result": state.min_x,
             "n_step": state.n_step,
