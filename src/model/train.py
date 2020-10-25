@@ -9,24 +9,24 @@ Note: Run with --alsologtostderr to see outputs.
 """
 
 import functools
-import tensorflow.compat.v2 as tf
 import os
 import pickle
 import time
 from typing import Any, Mapping
 
-from absl import app
-from absl import flags
-from absl import logging
 import haiku as hk
-from src.model import dataset
-from src.model import model
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
+import tensorflow.compat.v2 as tf
+from absl import app
+from absl import flags
+from absl import logging
 
-from src.modules.rootfind import rootfind
+from src.model import dataset
+from src.model import model
+from src.modules.deq import deq
 
 flags.DEFINE_integer('batch_size', 16, 'Train batch size per core')
 flags.DEFINE_integer('sequence_length', 128, 'Sequence length to learn on')
@@ -65,29 +65,27 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
         positional_embeddings = hk.get_parameter(
             'pos_embs', [seq_length, d_model], init=embed_init)
 
+        x = input_embeddings + positional_embeddings
+
         # Create transformer block
-        transformerXL = model.TransformerXLBlock(
+        transformer_block = model.UTBlock(
             num_heads=num_heads,
             num_layers=num_layers,
-            mem_length=num_layers,
             dropout_rate=dropout_rate)
 
-        z_0 = jnp.zeros_like(input_embeddings)
-        mems = jnp.zeros((num_layers, batch_size, seq_length, d_model))
+        transformed_net = hk.transform(transformer_block)
 
-        f = functools.partial(transformerXL, is_training=is_training)
+        # lift params
+        inner_params = hk.experimental.lift(
+            transformed_net.init)(hk.next_rng_key(), x, x, input_mask, is_training)
 
-        # Run transformer through DEQ
-        z_star = rootfind(f, z_0, max_iter, input_embeddings, positional_embeddings, mems, input_mask)
+        # define block f(params, rng, h)
+        def fun(_params, _rng, _h):
+            return transformed_net.apply(_params, _rng, x, _h, input_mask, is_training)
 
-        if is_training:
-            # Run once more to collect gradients of transformer
-            z_star = transformerXL(z_star,
-                                   input_embeddings,
-                                   positional_embeddings,
-                                   mems,
-                                   input_mask,
-                                   is_training)
+        # apply deq to functions of form f(params, x)
+        z_0 = jnp.zeros_like(x)
+        z_star = deq(inner_params, hk.next_rng_key(), z_0, fun, max_iter, is_training)
 
         # Reverse the embeddings (untied).
         return hk.Linear(vocab_size)(z_star)
@@ -124,7 +122,7 @@ class Updater:
         self._loss_fn = loss_fn
         self._opt = optimizer
 
-    @functools.partial(jax.jit, static_argnums=0)
+    # @functools.partial(jax.jit, static_argnums=0)
     def init(self, master_rng, data):
         """Initializes state of the updater."""
         out_rng, init_rng = jax.random.split(master_rng)
@@ -138,7 +136,7 @@ class Updater:
         )
         return out
 
-    @functools.partial(jax.jit, static_argnums=0)
+    # @functools.partial(jax.jit, static_argnums=0)
     def update(self, state: Mapping[str, Any], data: Mapping[str, jnp.ndarray]):
         """Updates the state using some data and returns metrics."""
         rng, new_rng = jax.random.split(state['rng'])

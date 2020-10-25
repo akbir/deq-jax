@@ -9,9 +9,9 @@ Python >= 3.5 and Haiku >= 0.0.2
 ## Major Components
 This repo provides the following re-usable components:
 
-1. Jax implementation of the Broyden's method, a quasi-Newton method for finding roots in k variables. This method is JIT-able.
-2. Jax implementation of Rootfind forward and backward method with custom vector-Jacobi product (backwards method)
-3. (WIP) Haiku implementation of the Transformer XL
+1. JAX implementation of the Broyden's method, a quasi-Newton method for finding roots in k variables. This method is JIT-able
+2. Implementation of Rootfind forward and backward method with custom vector-Jacobi product (backwards method) for Haiku pure functions
+3. Haiku implementation of the Transformer with input injections
 
 ## Usage
 All DEQ instantiations share the same underlying framework, whose core functionalities are provided in src/modules.
@@ -35,7 +35,7 @@ def build_forward(output_size, max_iter):
         inner_params = hk.experimental.lift(
             transformed_net.init)(hk.next_rng_key(), x)
         
-        # apply deq to functions of form f(params, z)
+        # apply deq to functions of form f(params, rng, z)
         z = deq(inner_params, hk.next_rng_key(), x,
                  transformed_net.apply, max_iter, is_training)
 
