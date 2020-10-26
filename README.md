@@ -10,7 +10,7 @@ Python >= 3.5 and Haiku >= 0.0.2
 This repo provides the following re-usable components:
 
 1. JAX implementation of the Broyden's method, a quasi-Newton method for finding roots in k variables. This method is JIT-able
-2. Implementation of Rootfind forward and backward method with custom vector-Jacobi product (backwards method) for Haiku pure functions
+2. JAX implementation DEQ model (custom backwards method) for Haiku pure functions
 3. Haiku implementation of the Transformer with input injections
 
 ## Usage
