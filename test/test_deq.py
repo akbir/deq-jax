@@ -106,10 +106,10 @@ def test_deq_with_hk_using_rng():
 
     value = loss_fn(params, rng, 2 * input)
     params_grad = grad(loss_fn)(params, rng, 2 * input)
-    np.testing.assert_almost_equal(-2.094507, value)
+    np.testing.assert_almost_equal(-1.504659, value)
 
-    expected_weights = np.asarray([[ 0.47394884, -0.25200003,  0.08285569],
-                                    [ 0.47394884,  0.08946458,  1.0635897 ],
-                                    [ 0.47394884,  0.08946458,  1.0635897 ]])
+    expected_weights = np.asarray([[ 0.6346791, -0.4629553,  0.0433462],
+                                   [ 0.6346791, -0.4629553,  0.0433462],
+                                   [ 0.6346791, -0.4629553,  1.9773146]])
 
     np.testing.assert_almost_equal(expected_weights, params_grad['lifted/linear_with_dropout/linear']['w'])

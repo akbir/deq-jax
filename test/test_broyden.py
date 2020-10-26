@@ -14,7 +14,7 @@ def test_broyden_in_haiku():
                 transformed_linear.init)(hk.next_rng_key(), x)
 
             f = lambda z: transformed_linear.apply(inner_params, z)-z
-            y = broyden(f, x, max_iter, eps=0.01)['result']
+            y = broyden(f, x, max_iter, eps=0.00001)['result']
             return f(y)-y
 
         return forward_fn

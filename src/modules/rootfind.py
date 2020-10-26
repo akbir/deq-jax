@@ -39,10 +39,11 @@ def rootfind_bwd(fun, max_iter, res, grad):
 
     result_info = broyden(h_fun, dl_df_est, max_iter, eps)
     dl_df_est = result_info['result']
-    # passed back gradient via d/dx and return nothing to other params
 
+    # passed back gradient via d/dx and return nothing to other params
     arg_grads = tuple([None for _ in args])
-    return None, None, dl_df_est, *arg_grads
+    return_tuple = (None, None, dl_df_est, *arg_grads)
+    return return_tuple
 
 
 @partial(jax.custom_vjp, nondiff_argnums=(0, 1))
@@ -71,9 +72,10 @@ def dumb_fwd(fun: Callable, max_iter: int, params: dict, rng, x: jnp.ndarray, *a
 
 def dumb_bwd(fun, max_iter, res, grad):
     (params, rng, z_star, *args) = res
+    # passed back gradient via d/dx and return nothing to other params
     arg_grads = tuple([None for _ in args])
-
-    return None, None, grad, *arg_grads
+    return_tuple = (None, None, grad, *arg_grads)
+    return return_tuple
 
 rootfind.defvjp(rootfind_fwd, dumb_bwd)
 rootfind_grad.defvjp(dumb_fwd, rootfind_bwd)

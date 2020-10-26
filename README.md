@@ -4,7 +4,7 @@ Jax Implementation for the deep equilibrium (DEQ) model, an implicit-depth archi
 Unlike many existing "deep" techniques, the DEQ model is a implicit-depth architecture that directly solves for and backpropagates through the equilibrium state of an (effectively) infinitely deep network. 
 
 ## Prerequisite
-Python >= 3.5 and Haiku >= 0.0.2
+Python >= 3.6 and Haiku >= 0.0.2
 
 ## Major Components
 This repo provides the following re-usable components:
