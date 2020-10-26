@@ -64,7 +64,7 @@ $ pip install git+https://github.com/deepmind/dm-haiku
 ```
 To run the transformer, you will need additional libraries used by Haiku's example.
 ```
-$ pip install -r examples/requirements.txt
+$ pip install tensorflow_datasets tensorflow optax
 ```
 To run tests, we use [pytest](https://docs.pytest.org/en/stable/getting-started.html):
 ```
