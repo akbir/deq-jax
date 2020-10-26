@@ -79,11 +79,9 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
         inner_params = hk.experimental.lift(
             transformed_net.init)(hk.next_rng_key(), x, x, input_mask, is_training)
 
-        # # define block f(params, rng, h)
-        # fun = functools.partial(transformed_net.apply, mask=input_mask, is_training=is_training)
-        f = transformed_net.apply
+        def f(_params, _rng, _z, *args): return transformed_net.apply(_params, _rng, _z, *args, is_training=is_training)
         z_0 = jnp.zeros_like(x)
-        z_star = deq(inner_params, hk.next_rng_key(), z_0, f, max_iter, is_training, x, input_mask, is_training)
+        z_star = deq(inner_params, hk.next_rng_key(), z_0, f, max_iter, is_training, x, input_mask)
 
         # Reverse the embeddings (untied).
         return hk.Linear(vocab_size)(z_star)
@@ -120,7 +118,7 @@ class Updater:
         self._loss_fn = loss_fn
         self._opt = optimizer
 
-    # @functools.partial(jax.jit, static_argnums=0)
+    @functools.partial(jax.jit, static_argnums=0)
     def init(self, master_rng, data):
         """Initializes state of the updater."""
         out_rng, init_rng = jax.random.split(master_rng)
@@ -134,7 +132,7 @@ class Updater:
         )
         return out
 
-    # @functools.partial(jax.jit, static_argnums=0)
+    @functools.partial(jax.jit, static_argnums=0)
     def update(self, state: Mapping[str, Any], data: Mapping[str, jnp.ndarray]):
         """Updates the state using some data and returns metrics."""
         rng, new_rng = jax.random.split(state['rng'])

@@ -63,27 +63,32 @@ def test_deq_with_hk_using_rng():
     class linear_with_dropout(hk.Module):
         def __init__(self,
                      output_size: int,
+                     dropout_rate: float,
                      name: Optional[str] = None):
             super().__init__(name=name)
             self.output_size = output_size
+            self._dropout_rate = dropout_rate
 
         def __call__(self,
-                     x: jnp.ndarray) -> jnp.ndarray:
+                     x: jnp.ndarray,
+                     is_training: bool) -> jnp.ndarray:
 
+            dropout_rate = self._dropout_rate if is_training else 0.
             h = hk.Linear(self.output_size,
                           w_init=hk.initializers.Constant(1),
                           b_init=hk.initializers.Constant(1))(x)
-            return hk.dropout(hk.next_rng_key(), 0.1, h)
+            return hk.dropout(hk.next_rng_key(), dropout_rate, h)
 
     def build_forward(output_size, max_iter):
         def forward_fn(x: jnp.ndarray) -> jnp.ndarray:
-            linear_1 = linear_with_dropout(3)
+            linear_1 = linear_with_dropout(3, 0.5)
             transformed_linear = hk.transform(linear_1)
 
             inner_params = hk.experimental.lift(
-                transformed_linear.init)(hk.next_rng_key(), x)
+                transformed_linear.init)(hk.next_rng_key(), x, True)
 
-            def fun(_params, _rng, h): return transformed_linear.apply(_params, _rng, h)
+            def fun(_params, _rng, h): return transformed_linear.apply(_params, _rng, h, True)
+
             z = deq(inner_params, hk.next_rng_key(), x, fun, max_iter, True)
             return hk.Linear(output_size, name='l2', with_bias=False)(z)
 
