@@ -66,7 +66,7 @@ To run the transformer, you will need additional libraries used by Haiku's examp
 ```
 $ pip install tensorflow_datasets tensorflow optax
 ```
-To run tests, we use [pytest](https://docs.pytest.org/en/stable/getting-started.html):
+To run tests, use [pytest](https://docs.pytest.org/en/stable/getting-started.html):
 ```
 $ pip install pytest
 $ python -m pytest test/
