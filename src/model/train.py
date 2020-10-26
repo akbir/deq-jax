@@ -81,7 +81,7 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
 
         def f(_params, _rng, _z, *args): return transformed_net.apply(_params, _rng, _z, *args, is_training=is_training)
         z_0 = jnp.zeros_like(x)
-        z_star = deq(inner_params, hk.next_rng_key(), z_0, f, max_iter, is_training, x, input_mask)
+        z_star = deq(inner_params, hk.next_rng_key(), z_0, f, max_iter, x, input_mask)
 
         # Reverse the embeddings (untied).
         return hk.Linear(vocab_size)(z_star)

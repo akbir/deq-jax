@@ -36,8 +36,7 @@ def build_forward(output_size, max_iter):
             transformed_net.init)(hk.next_rng_key(), x)
         
         # apply deq to functions of form f(params, rng, z, *args)
-        z = deq(inner_params, hk.next_rng_key(), x,
-                 transformed_net.apply, max_iter, is_training)
+        z = deq(inner_params,hk.next_rng_key(),x,transformed_net.apply,max_iter)
 
         return hk.Linear(output_size)(z)
     return forward_fn

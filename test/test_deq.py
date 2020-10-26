@@ -14,7 +14,7 @@ def test_deq_multi_variable():
         return params['w'] * x + params['b']
 
     def toy_model(params, data):
-        h = deq(params, None, data, layer, 30, True)
+        h = deq(params, None, data, layer, 30)
         return jnp.sum(h)
 
     params = {'w': -2 * jnp.ones((1, 2, 3)), 'b': jnp.ones((1, 2, 3))}
@@ -37,7 +37,7 @@ def test_deq_haiku():
             inner_params = hk.experimental.lift(
                 transformed_linear.init)(hk.next_rng_key(), x)
 
-            z = deq(inner_params, hk.next_rng_key(), x, transformed_linear.apply, max_iter, True)
+            z = deq(inner_params, hk.next_rng_key(), x, transformed_linear.apply, max_iter)
             return z
 
         return forward_fn
@@ -89,7 +89,7 @@ def test_deq_with_hk_using_rng():
 
             def fun(_params, _rng, h): return transformed_linear.apply(_params, _rng, h, True)
 
-            z = deq(inner_params, hk.next_rng_key(), x, fun, max_iter, True)
+            z = deq(inner_params, hk.next_rng_key(), x, fun, max_iter)
             return hk.Linear(output_size, name='l2', with_bias=False)(z)
 
         return forward_fn

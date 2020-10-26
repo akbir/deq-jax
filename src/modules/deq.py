@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from src.modules.rootfind import rootfind, rootfind_grad
 
 
-def deq(params: dict, rng, x: jnp.ndarray, fun: Callable, max_iter: int, is_training: bool, *args) -> jnp.ndarray:
+def deq(params: dict, rng, x: jnp.ndarray, fun: Callable, max_iter: int, *args) -> jnp.ndarray:
     """
     Apply Deep Equilibrium Network to haiku function.
     :param rng:
@@ -12,7 +12,6 @@ def deq(params: dict, rng, x: jnp.ndarray, fun: Callable, max_iter: int, is_trai
     :param max_iter: maximum number of integers for the broyden method
     :param x: initial guess for broyden method
     :param params: Hk.Params
-    :param is_training: Set True to calculate gradients for backward pass
     :return:
     """
 
@@ -22,8 +21,8 @@ def deq(params: dict, rng, x: jnp.ndarray, fun: Callable, max_iter: int, is_trai
     # find equilibrium point
     z = rootfind(g, max_iter, params, rng, x, *args)
 
-    if is_training:
-        # set up correct graph for chain rule (bk pass)
-        z = fun(params, rng, z, *args)
-        z = rootfind_grad(g, max_iter, params, rng, z, *args)
+    # set up correct graph for chain rule (bk pass)
+    # original implementation this is run only if in_training
+    z = fun(params, rng, z, *args)
+    z = rootfind_grad(g, max_iter, params, rng, z, *args)
     return z
