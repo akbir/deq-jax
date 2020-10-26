@@ -8,23 +8,12 @@ from src.modules.broyden import broyden
 
 
 def rootfind_fwd(fun: Callable, max_iter: int, params: dict, rng: jnp.ndarray, x: jnp.ndarray, *args):
-    """Forward for applying rootfind to a function (fun)
-    Requires fun to be form f(x), where x is the value to optimise, other values must be frozen
-    """
     z_star = rootfind(fun, max_iter, params, rng, x, *args)
     # Returns primal output and residuals to be used in backward pass by f_bwd.
     return z_star, (params, rng, z_star, *args)
 
 
 def rootfind_bwd(fun, max_iter, res, grad):
-    """Backward method for evaluating update for gradients for DEQ see
-
-    :param fun:
-    :param max_iter:
-    :param res:
-    :param grad:
-    :return:
-    """
     # returns dl/dz_star * J^(-1)_{g}
     (params, rng, z_star, *args) = res
     (_, vjp_fun) = jax.vjp(fun, params, rng, z_star, *args)

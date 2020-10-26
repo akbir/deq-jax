@@ -3,9 +3,6 @@ Jax Implementation for the deep equilibrium (DEQ) model, an implicit-depth archi
 
 Unlike many existing "deep" techniques, the DEQ model is a implicit-depth architecture that directly solves for and backpropagates through the equilibrium state of an (effectively) infinitely deep network. 
 
-## Prerequisite
-Python >= 3.6 and Haiku >= 0.0.2
-
 ## Major Components
 This repo provides the following re-usable components:
 
@@ -55,60 +52,25 @@ def loss_fn(params, rng, x):
 
 value, grad = value_and_grad(loss_fn)(params, rng, jnp.ones((1, 2, 3)))
 ```
+For more details on running the Transformer example look into `model/train.py`. 
+## Installation
+DEQ relies on Python >= 3.6 and Haiku >= 0.0.2. 
 
-To run the Transformer example,  we write the forward method as:
+First, follow these instructions to install [JAX](https://github.com/google/jax#installation) with the relevant accelerator support.
 
-```python
-def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
-                     num_layers: int, dropout_rate: float, max_iter: int):
-    """Create the model's forward pass."""
-
-    def forward_fn(data: Mapping[str, jnp.ndarray],
-                   is_training: bool = True) -> jnp.ndarray:
-        """Forward pass."""
-        tokens = data['obs']
-        input_mask = jnp.greater(tokens, 0)
-        batch_size, seq_length = tokens.shape
-
-        # Embed the input tokens and positions.
-        embed_init = hk.initializers.TruncatedNormal(stddev=0.02)
-        token_embedding_map = hk.Embed(vocab_size, d_model, w_init=embed_init)
-        token_embedding = token_embedding_map(tokens)
-        positional_embeddings = hk.get_parameter(
-            'pos_embs', [seq_length, d_model], init=embed_init)
-
-        x = token_embedding + positional_embeddings
-        h = jnp.zeros_like(x)
-
-        # Create transformer block
-        transformer_block = model.UTBlock(
-            num_heads=num_heads,
-            num_layers=num_layers,
-            dropout_rate=dropout_rate)
-
-        transformed_net = hk.transform(transformer_block)
-
-        # Lift params
-        inner_params = hk.experimental.lift(
-            transformed_net.init)(hk.next_rng_key(), h, x, input_mask, is_training)
-
-        # f(_params, _rng, _z, *args) 
-        def fun(_params, _rng, _z, *args):
-            return transformed_net.apply(_params, _rng, _z, *args, is_training=is_training)
-        
-        
-        z_star = deq(inner_params, hk.next_rng_key(), h, fun,
-                     max_iter, is_training, x, input_mask)
-
-        # Reverse the embeddings (untied).
-        return hk.Linear(vocab_size)(z_star)
-
-    return forward_fn
-
+Then, install Haiku using pip:
+```bash
+$ pip install git+https://github.com/deepmind/dm-haiku
 ```
-
-
-For more details on running the Transformer example look into `train.py`. 
+To run the transformer, you will need additional libraries used by Haiku's example.
+```
+$ pip install -r examples/requirements.txt
+```
+To run tests, we use [pytest](https://docs.pytest.org/en/stable/getting-started.html):
+```
+$ pip install pytest
+$ python -m pytest test/
+```
 ## Credits
 The repo takes direct inspiration from the [original implementation](https://github.com/locuslab/deq/tree/master) by Shaojie in Torch.
- The transformer module is modified from an [example](https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py) provided by Haiku.
+ The transformer module is modified from a [example](https://github.com/deepmind/dm-haiku/blob/master/examples/transformer/model.py) provided by Haiku.

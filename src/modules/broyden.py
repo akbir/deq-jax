@@ -1,9 +1,9 @@
 from typing import Callable, NamedTuple, Union
 
-import jax.numpy as jnp
-import haiku as hk
 import jax
+import jax.numpy as jnp
 from jax import partial, lax
+
 
 class _BroydenResults(NamedTuple):
     """Results from Broyden optimization.

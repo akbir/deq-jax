@@ -7,11 +7,13 @@ from src.modules.rootfind import rootfind, rootfind_grad
 def deq(params: dict, rng, x: jnp.ndarray, fun: Callable, max_iter: int, *args) -> jnp.ndarray:
     """
     Apply Deep Equilibrium Network to haiku function.
-    :param rng:
-    :param fun: func to apply in the deep equilibrium limit
+    :param params: params for haiku function
+    :param rng: rng for init and apply of haiku function
+    :param fun: func to apply in the deep equilibrium limit, f(params, rng, x, *args)
+     and only a function of JAX primatives (e.g can not be passed bool)
     :param max_iter: maximum number of integers for the broyden method
     :param x: initial guess for broyden method
-    :param params: Hk.Params
+    :param args: all other JAX primatives which must be passed to the function
     :return:
     """
 
