@@ -66,6 +66,7 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
             'pos_embs', [seq_length, d_model], init=embed_init)
 
         x = input_embeddings + positional_embeddings
+        h = jnp.zeros_like(x)
 
         # Create transformer block
         transformer_block = model.UTBlock(
@@ -77,11 +78,10 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
 
         # lift params
         inner_params = hk.experimental.lift(
-            transformed_net.init)(hk.next_rng_key(), x, x, input_mask, is_training)
+            transformed_net.init)(hk.next_rng_key(), h, x, input_mask, is_training)
 
         def f(_params, _rng, _z, *args): return transformed_net.apply(_params, _rng, _z, *args, is_training=is_training)
-        z_0 = jnp.zeros_like(x)
-        z_star = deq(inner_params, hk.next_rng_key(), z_0, f, max_iter, x, input_mask)
+        z_star = deq(inner_params, hk.next_rng_key(), h, f, max_iter, x, input_mask)
 
         # Reverse the embeddings (untied).
         return hk.Linear(vocab_size)(z_star)

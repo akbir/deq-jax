@@ -22,15 +22,15 @@ def test_transformer_block():
 
 @pytest.fixture
 def train_dataset():
-    batch_size, sequence_length, vocab_size = 16, 128, 100
+    batch_size, sequence_length, vocab_size = 16, 30, 100
     rng = jax.random.PRNGKey(0)
     data = jax.random.randint(rng, (batch_size, sequence_length), 0, vocab_size)
     return (data for data in [{'obs': data[:, :-1], 'target': data[:, 1:]}] * 200)
 
 
-def test_train(train_dataset):
-    vocab_size, d_model, num_heads, num_layers = 100, 256, 4, 1
-    dropout_rate, grad_clip_value, learning_rate = 0.01, 0.25, 2e-4
+def test_batch_overfit(train_dataset):
+    vocab_size, d_model, num_heads, num_layers = 100, 32, 8, 1
+    dropout_rate, grad_clip_value, learning_rate = 0.01, 0.25, 2e-2
     max_iter = 100
 
     # Set up the model, loss, and updater.
@@ -51,10 +51,10 @@ def test_train(train_dataset):
     data = next(train_dataset)
     state = updater.init(rng, data)
 
-    for step in range(10):
+    for step in range(100):
         data = next(train_dataset)
         state, metrics = updater.update(state, data)
-        print(metrics['loss'])
 
-    assert metrics == None
+    assert metrics['loss'] < 0.1
+    assert metrics['step'] == 99
 
