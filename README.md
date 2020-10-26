@@ -78,6 +78,7 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
             'pos_embs', [seq_length, d_model], init=embed_init)
 
         x = token_embedding + positional_embeddings
+        h = jnp.zeros_like(x)
 
         # Create transformer block
         transformer_block = model.UTBlock(
@@ -89,16 +90,14 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
 
         # Lift params
         inner_params = hk.experimental.lift(
-            transformed_net.init)(hk.next_rng_key(), x, x, input_mask, is_training)
+            transformed_net.init)(hk.next_rng_key(), h, x, input_mask, is_training)
 
-        # f(_params, _rng, _zz, *args) 
+        # f(_params, _rng, _z, *args) 
         def fun(_params, _rng, _z, *args):
             return transformed_net.apply(_params, _rng, _z, *args, is_training=is_training)
         
-        # Find z* hidden state at equilbrium point
-        z_0 = jnp.zeros_like(x)
         
-        z_star = deq(inner_params, hk.next_rng_key(), z_0, fun,
+        z_star = deq(inner_params, hk.next_rng_key(), h, fun,
                      max_iter, is_training, x, input_mask)
 
         # Reverse the embeddings (untied).
