@@ -8,7 +8,7 @@ import optax
 import pytest
 
 from src.model.model import UTBlock
-from src.model.train import build_forward_fn, lm_loss_fn, Updater, CheckpointingUpdater
+from src.model.train import build_forward_fn, lm_loss_fn, Updater
 
 
 @hk.testing.transform_and_run
@@ -31,7 +31,7 @@ def train_dataset():
 def test_train(train_dataset):
     vocab_size, d_model, num_heads, num_layers = 100, 256, 4, 1
     dropout_rate, grad_clip_value, learning_rate = 0.1, 0.25, 2e-4
-    max_iter = 100
+    max_iter = 30
 
     # Set up the model, loss, and updater.
     forward_fn = build_forward_fn(vocab_size, d_model, num_heads,
@@ -51,6 +51,7 @@ def test_train(train_dataset):
     data = next(train_dataset)
     state = updater.init(rng, data)
 
-    for step in range(5):
+    for step in range(1):
         data = next(train_dataset)
         state, metrics = updater.update(state, data)
+

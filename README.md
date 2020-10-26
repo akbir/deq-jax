@@ -35,7 +35,7 @@ def build_forward(output_size, max_iter):
         inner_params = hk.experimental.lift(
             transformed_net.init)(hk.next_rng_key(), x)
         
-        # apply deq to functions of form f(params, rng, z)
+        # apply deq to functions of form f(params, rng, z, *args)
         z = deq(inner_params, hk.next_rng_key(), x,
                  transformed_net.apply, max_iter, is_training)
 

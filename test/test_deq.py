@@ -6,7 +6,6 @@ import jax.numpy as jnp
 import numpy as np
 from jax import value_and_grad, grad
 
-from src.model import model
 from src.modules.deq import deq
 
 

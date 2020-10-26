@@ -80,16 +80,16 @@ def update(delta_x, delta_gx, Us, VTs, n_step):
     return Us, VTs
 
 
-def line_search(g: Callable, direction: jnp.ndarray, x0: jnp.ndarray, g0: jnp.ndarray):
+def line_search(g: Callable, direction: jnp.ndarray, x0: jnp.ndarray, g0: jnp.ndarray, *args):
     """
     `update` is the proposed direction of update.
     """
     s = 1.0
     x_est = x0 + s * direction
-    g0_new = g(x_est)
+    g0_new = g(x_est, *args)
     return x_est - x0, g0_new - g0
 
-def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float) -> dict:
+def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float, *args) -> dict:
     """
     :param g: Function to find root of (e.g g(x) = f(x)-x)
     :param x0: Initial guess  (batch_size, hidden, seq_length)
@@ -107,7 +107,7 @@ def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float) -> dict:
     # For fast calculation of inv_jacobian (approximately) we store as Us and VTs
 
     bsz, total_hsize, seq_len = x0.shape
-    gx = g(x0)  # (bsz, 2d, L')
+    gx = g(x0, *args)  # (bsz, 2d, L')
     init_objective = jnp.linalg.norm(gx)
 
     # To be used in protective breaks
@@ -139,7 +139,7 @@ def broyden(g: Callable, x0: jnp.ndarray, max_iter: int, eps: float) -> dict:
 
     def body_fun(state: _BroydenResults):
         inv_jacobian = -matvec(state.Us, state.VTs, state.gx)
-        dx, delta_gx = line_search(g, inv_jacobian, state.x, state.gx)
+        dx, delta_gx = line_search(g, inv_jacobian, state.x, state.gx, *args)
 
         state = state._replace(
             x=state.x + dx,

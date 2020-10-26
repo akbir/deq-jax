@@ -79,13 +79,11 @@ def build_forward_fn(vocab_size: int, d_model: int, num_heads: int,
         inner_params = hk.experimental.lift(
             transformed_net.init)(hk.next_rng_key(), x, x, input_mask, is_training)
 
-        # define block f(params, rng, h)
-        def fun(_params, _rng, _h):
-            return transformed_net.apply(_params, _rng, x, _h, input_mask, is_training)
-
-        # apply deq to functions of form f(params, x)
+        # # define block f(params, rng, h)
+        # fun = functools.partial(transformed_net.apply, mask=input_mask, is_training=is_training)
+        f = transformed_net.apply
         z_0 = jnp.zeros_like(x)
-        z_star = deq(inner_params, hk.next_rng_key(), z_0, fun, max_iter, is_training)
+        z_star = deq(inner_params, hk.next_rng_key(), z_0, f, max_iter, is_training, x, input_mask, is_training)
 
         # Reverse the embeddings (untied).
         return hk.Linear(vocab_size)(z_star)

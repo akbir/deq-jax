@@ -108,13 +108,13 @@ class UTBlock(hk.Module):
         self._dropout_rate = dropout_rate
 
     def __call__(self,
-                 x: jnp.ndarray,
                  h: jnp.ndarray,
+                 input_embs: jnp.ndarray,
                  mask: Optional[jnp.ndarray],
                  is_training: bool) -> jnp.ndarray:
         """Connects the transformer.
         Args:
-          x: Inputs, [B, T, H].
+          input_embs: Inputs, [B, T, H].
           h: Hidden, [B, T, H].
           h: Hidden, [B, T, H].
           mask: Padding mask, [B, T].
@@ -130,7 +130,7 @@ class UTBlock(hk.Module):
 
         for i in range(self._num_layers):
             # input injections
-            h = h + x
+            h = h + input_embs
 
             # regular transformer block
             h_norm = layer_norm(h, name=f'h{i}_ln_1')
